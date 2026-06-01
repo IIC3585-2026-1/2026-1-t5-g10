@@ -1,126 +1,97 @@
 <script>
-  import { onMount } from 'svelte';
-  import { fetchExchangeRates } from './services/currencyService.js';
-  import { exchangeRates, loading, error, lastUpdate } from './stores.js';
-  import Header from './components/Header.svelte';
-  import ConverterCard from './components/ConverterCard.svelte';
-  import ExchangeRateInfo from './components/ExchangeRateInfo.svelte';
-  import UpdateStatus from './components/UpdateStatus.svelte';
+  import { onMount } from 'svelte'
+  import { fetchExchangeRates } from './services/currencyService.js'
+  import { exchangeRates, loading, error, lastUpdate, addToHistory, conversionHistory, currentExchangeRate, availableCurrencies, sourceCurrency, targetCurrency } from './stores.js'
+  import Header from './components/Header.svelte'
+  import ConverterCard from './components/ConverterCard.svelte'
+  import UpdateStatus from './components/UpdateStatus.svelte'
+  import ConversionHistory from './components/ConversionHistory.svelte'
+  import RateChart from './components/RateChart.svelte'
 
-  let autoRefreshInterval;
+  let autoRefreshInterval
 
   onMount(async () => {
-    // Cargar tasas de cambio al montar
-    await loadExchangeRates();
-    
-    // Auto-actualizar cada 5 minutos (300,000 ms)
-    autoRefreshInterval = setInterval(loadExchangeRates, 300000);
-
-    return () => {
-      if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    };
-  });
+    await loadExchangeRates()
+    autoRefreshInterval = setInterval(loadExchangeRates, 300000)
+    return () => { if (autoRefreshInterval) clearInterval(autoRefreshInterval) }
+  })
 
   async function loadExchangeRates() {
-    loading.set(true);
-    error.set(null);
-    
+    loading.set(true)
+    error.set(null)
     try {
-      const rates = await fetchExchangeRates('USD');
-      exchangeRates.set(rates);
-      lastUpdate.set(new Date());
+      const rates = await fetchExchangeRates('USD')
+      exchangeRates.set(rates)
+      lastUpdate.set(new Date())
     } catch (err) {
-      error.set(err.message);
-      console.error('Error:', err);
+      error.set(err.message)
     } finally {
-      loading.set(false);
+      loading.set(false)
     }
   }
 
   async function handleRefresh() {
-    await loadExchangeRates();
+    await loadExchangeRates()
   }
 </script>
 
-<div class="app-container">
+<div class="app-shell">
   <Header on:refresh={handleRefresh} />
-  
+
   <main class="main-content">
-    <div class="converter-section">
+    <div class="converter-wrapper">
       <ConverterCard />
-      <ExchangeRateInfo />
+      <button class="save-btn" on:click={addToHistory} disabled={!$currentExchangeRate}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="save-icon">
+          <path d="M12 5v14M5 12l7 7 7-7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Guardar conversión
+      </button>
+      <UpdateStatus />
+      <ConversionHistory />
     </div>
+
+    <aside class="info-panel">
+      <div class="info-block">
+        <span class="info-label">Framework</span>
+        <span class="info-value">Svelte 4</span>
+      </div>
+      <div class="info-block">
+        <span class="info-label">Estado</span>
+        <span class="info-value">Svelte Stores</span>
+      </div>
+      <div class="info-block">
+        <span class="info-label">API</span>
+        <span class="info-value">ExchangeRate API</span>
+      </div>
+      <div class="info-block">
+        <span class="info-label">Monedas</span>
+        <span class="info-value">{$availableCurrencies.length} disponibles</span>
+      </div>
+
+      <div class="currencies-list">
+        <span class="info-label">Monedas disponibles</span>
+        <div class="currency-tags">
+          {#each $availableCurrencies as c (c.code)}
+            <span
+              class="currency-tag"
+              class:active={c.code === $sourceCurrency || c.code === $targetCurrency}
+              title="{c.code} — {c.name}"
+            >
+              {c.flag}
+            </span>
+          {/each}
+        </div>
+      </div>
+
+      <RateChart />
+    </aside>
   </main>
 
   <footer class="app-footer">
-    <UpdateStatus />
+    <span>MoneyExchange — IIC3885 Grupo 10</span>
+    <span class="footer-separator">·</span>
+    <span>Svelte 4 + Stores</span>
   </footer>
 </div>
 
-<style>
-  :global(*) {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
-
-  :global(body) {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-    min-height: 100vh;
-    padding: 20px;
-    color: #333;
-  }
-
-  :global(body)::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: 
-      radial-gradient(circle at 20% 50%, rgba(230, 126, 34, 0.1) 0%, transparent 50%),
-      radial-gradient(circle at 80% 80%, rgba(52, 152, 219, 0.1) 0%, transparent 50%);
-    pointer-events: none;
-    z-index: -1;
-  }
-
-  .app-container {
-    max-width: 700px;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-  }
-
-  .main-content {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 40px 0;
-  }
-
-  .converter-section {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-  }
-
-  .app-footer {
-    padding: 20px;
-    text-align: center;
-  }
-
-  @media (max-width: 768px) {
-    .main-content {
-      padding: 30px 0;
-    }
-
-    .converter-section {
-      gap: 18px;
-    }
-  }
-</style>

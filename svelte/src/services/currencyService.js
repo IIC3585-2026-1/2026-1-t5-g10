@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// API pública gratuita para tasas de cambio
 const API_BASE_URL = 'https://open.er-api.com/v6/latest';
+const FAWAZ_BASE = 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api';
 
 /**
  * Obtiene las tasas de cambio más recientes de la API
@@ -43,18 +43,39 @@ export function convertCurrency(amount, fromCurrency, toCurrency, rates) {
   return amountInBase * toRate;
 }
 
-/**
- * Obtiene la tasa de cambio entre dos monedas
- * @param {string} fromCurrency - Moneda de origen
- * @param {string} toCurrency - Moneda de destino
- * @param {Object} rates - Objeto con las tasas de cambio
- * @returns {number} Tasa de cambio
- */
 export function getExchangeRate(fromCurrency, toCurrency, rates) {
   if (fromCurrency === toCurrency) return 1;
-  
   const fromRate = rates[fromCurrency] || 1;
   const toRate = rates[toCurrency] || 1;
-  
   return toRate / fromRate;
+}
+
+export async function fetchHistoricalRates(from, to, days = 30) {
+  const fromKey = from.toLowerCase();
+  const toKey = to.toLowerCase();
+
+  const today = new Date();
+  const step = Math.floor(days / 9);
+  const dates = [];
+  for (let i = days; i >= 0; i -= step) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    dates.push(d.toISOString().split('T')[0]);
+  }
+
+  try {
+    const results = await Promise.all(
+      dates.map(date =>
+        axios
+          .get(`${FAWAZ_BASE}@${date}/v1/currencies/${fromKey}.min.json`)
+          .then(r => ({ date, rate: r.data[fromKey]?.[toKey] ?? null }))
+          .catch(() => ({ date, rate: null }))
+      )
+    );
+    const filtered = results.filter(r => r.rate !== null);
+    if (!filtered.length) throw new Error('No se pudo obtener el historial de tasas.');
+    return filtered;
+  } catch (error) {
+    throw new Error(error.message || 'No se pudo obtener el historial de tasas.');
+  }
 }
